@@ -1,0 +1,371 @@
+---
+title: "Impact of Lifestyle and Physical Indicators on First Diagnosis of Cancer"
+author:
+  - Cong Lyu
+  - Christine Xing
+  - Shahzab Hussain
+output:
+  pdf_document: default
+  html_document:
+    df_print: paged
+---
+
+
+
+## Import data
+
+```{r}
+library(ipumsr)
+
+ddi <- read_ipums_ddi("nhis_00003.xml")
+data <- read_ipums_micro(ddi)
+```
+
+
+```{r}
+names(data)
+col.ages <- c("CNBRANAG", "CNCOLNAG", "CNCOLRECTAG", "CNESOPAG", "CNHDNCKAG",
+              "CNLIVRAG", "CNPANCAG", "CNSTOMAG")
+col.cancers <- c("CNBRAN", "CNCOLN", "CNCOLRECT", "CNESOP", "CNHDNCK", 
+                 "CNLIVR", "CNPANC", "CNSTOM")
+col.numeric.categorical <- c("EDUC", "MAXEDUC", "SPOUSEDUC")
+col.categorical <- c("SEX", "QTCINCFAM")
+col.key <- c("SERIAL", "NHISHID", "NHISPID", "HHX")
+```
+
+## Topic 1 
+
+Response: The age of having cancer for the first time among these kinds of cancer
+
+### EDA 
+
+```{r}
+library(dplyr)
+# Data cleaning: figure out missing values
+data.clean <- data %>%
+  mutate(across(col.ages, ~if_else(. >= 96, NA_real_, .))) %>%
+  # mutate(across(c("EMPSTAT"), ~if_else(. >= 900, NA_real_, .))) %>%
+  # mutate(across(c("HOURSWRK"), ~if_else(. >= 97, NA_real_, .))) %>%
+  # mutate(across(c("EMPHI", "EMPFT", "SPOUSWKFT", "HEALTH", "ALCDRINKEV"),
+  #               ~if_else(. >= 7, NA_real_, .))) %>%
+  mutate(across(c("DIABTYPE"), ~if_else(. >= 7, NA_real_, .))) %>%
+  mutate(across(c("HEIGHT"), ~if_else(. >= 95, NA_real_, .))) %>%
+  mutate(across(c("WEIGHT", "BMICALC"), ~if_else(. >= 995, NA_real_, .))) %>%
+  mutate(across(c("ALCDRINKEV", "ALCEV30D"), ~if_else(. >= 7, NA_real_, .))) %>%
+  mutate(across(c("ALCEV30D"), ~if_else(. ==0, 1, .))) %>%
+  mutate(across(c("ALC5UPOCC30D"), ~if_else(. >= 97, NA_real_, .))) %>%
+  mutate(across(c("ALC5UPEVYR"),  ~if_else((. >= 7) | (. ==0), NA_real_, .))) %>%
+  mutate(across(c("MOD10FNO"), ~if_else(. >= 995, NA_real_, .))) %>%
+  mutate(across(c("MOD10FWK"), ~if_else((. >= 94) & (. <=96), 0, .))) %>%
+  mutate(across(c("MOD10FWK"), ~if_else((. ==93) | (. >= 97), NA_real_, .))) %>%
+  mutate(across(c("EMPSTAT"), ~if_else(. >= 900, NA_real_, .))) %>%
+  mutate(across(c("EMPHI"), ~if_else((. >= 7) | (. ==0), NA_real_, .))) %>%
+  mutate(across(c("SPOUSEDUC"), ~if_else((. >= 97) | (. ==0), NA_real_, .))) 
+
+
+### Check missing values 
+colSums(is.na(data.clean)) 
+
+subset.age.clean =  data.clean %>% 
+  filter(!is.na(CNBRANAG) | !is.na(CNCOLNAG) | !is.na(CNCOLRECTAG) |
+           !is.na(CNESOPAG) | !is.na(CNHDNCKAG) | !is.na(CNLIVRAG) |
+           !is.na(CNPANCAG) | !is.na(CNSTOMAG)) %>%
+  mutate(CNAG = pmin(as.numeric(CNBRANAG), as.numeric(CNCOLNAG), 
+                     as.numeric(CNCOLRECTAG), as.numeric(CNESOPAG),
+                     as.numeric(CNHDNCKAG), as.numeric(CNLIVRAG),
+                     as.numeric(CNPANCAG), as.numeric(CNSTOMAG), 
+                     na.rm = TRUE)) %>% 
+  mutate(across(c(SEX, EMPSTAT, EMPHI, QTCINCFAM, 
+                  ALCDRINKEV, ALC5UPEVYR, ALCEV30D, # Binary variables
+                  DIABTYPE), # non-numerical factor
+                ~as_factor(as_factor(.))))
+
+```
+
+Check info and labels
+
+```{r}
+ggplot2::ggplot(subset.age.clean, ggplot2::aes(x = as.factor(SEX), y=CNAG)) + ggplot2::geom_boxplot()
+ggplot2::ggplot(subset.age.clean, ggplot2::aes(x = as.factor(MAXEDUC), y=CNAG)) + ggplot2::geom_boxplot()
+ggplot2::ggplot(subset.age.clean, ggplot2::aes(x = as.factor(SPOUSEDUC), y=CNAG)) + ggplot2::geom_boxplot()
+ggplot2::ggplot(subset.age.clean, ggplot2::aes(x = as.factor(EMPSTAT), y=CNAG)) + ggplot2::geom_boxplot()
+ggplot2::ggplot(subset.age.clean, ggplot2::aes(x = as.factor(EMPHI), y=CNAG)) + ggplot2::geom_boxplot()
+ggplot2::ggplot(subset.age.clean, ggplot2::aes(x = as.factor(QTCINCFAM), y=CNAG)) + ggplot2::geom_boxplot()
+ggplot2::ggplot(subset.age.clean, ggplot2::aes(x = as.factor(HEALTH), y=CNAG)) + ggplot2::geom_boxplot()
+
+ggplot2::ggplot(subset.age.clean, ggplot2::aes(x = HEIGHT, y=CNAG)) + ggplot2::geom_point()
+ggplot2::ggplot(subset.age.clean, ggplot2::aes(x = WEIGHT, y=CNAG)) + ggplot2::geom_point()
+ggplot2::ggplot(subset.age.clean, ggplot2::aes(x = BMICALC, y=CNAG)) + ggplot2::geom_point()
+
+ggplot2::ggplot(subset.age.clean, ggplot2::aes(x = as.factor(DIABTYPE), y=CNAG)) + ggplot2::geom_boxplot()
+ggplot2::ggplot(subset.age.clean, ggplot2::aes(x = as.factor(ALCDRINKEV), y=CNAG)) + ggplot2::geom_boxplot()
+ggplot2::ggplot(subset.age.clean, ggplot2::aes(x = as.factor(ALC5UPEVYR), y=CNAG)) + ggplot2::geom_boxplot()
+ggplot2::ggplot(subset.age.clean, ggplot2::aes(x = as.factor(ALCEV30D), y=CNAG)) + ggplot2::geom_boxplot()
+ggplot2::ggplot(subset.age.clean, ggplot2::aes(x = as.factor(ALC5UPOCC30D), y=CNAG)) + ggplot2::geom_boxplot()
+# ggplot2::ggplot(subset.age.clean, ggplot2::aes(x = as.factor(MOD10FNO), y=CNAG)) + ggplot2::geom_boxplot()
+ggplot2::ggplot(subset.age.clean, ggplot2::aes(x = as.factor(MOD10FWK), y=CNAG)) + ggplot2::geom_boxplot()
+
+hist(subset.age.clean$CNAG, breaks=43)
+head(data$MOD10FWK   )
+summary(data$MOD10FWK)
+
+```
+
+### Models
+
+#### Saturated model
+
+```{r}
+library(MASS)
+subset.age.clean.nb <- subset.age.clean %>%
+  dplyr::select(SEX, MAXEDUC, EMPSTAT, QTCINCFAM, HEALTH, HEIGHT, 
+                WEIGHT, BMICALC, DIABTYPE, ALCEV30D, MOD10FWK, CNAG) %>%
+  na.omit()
+
+fit0.poisson = glm(CNAG ~ SEX + MAXEDUC + EMPSTAT + QTCINCFAM 
+           + HEALTH + HEIGHT + WEIGHT + BMICALC + DIABTYPE 
+           + ALCEV30D + MOD10FWK,
+           data=subset.age.clean.nb, family=poisson(link="log"),
+           na.action = na.omit)
+anova(fit0.poisson)
+summary(fit0.poisson)
+```
+#### Model selection
+Simplify: Backward stepwise
+
+```{r}
+fit0.poisson.backward <- step(fit0.poisson, direction = "backward")
+summary(fit0.poisson.backward)
+anova(fit0.poisson, fit0.poisson.backward)
+```
+
+```{r}
+anova(fit0.poisson, fit0.poisson.backward, test="Chisq")
+```
+
+```{r}
+# Load the necessary libraries
+library(ggplot2)
+library(reshape2)
+
+# Extract coefficients from both models
+coefficients_saturated <- coef(fit0.poisson)
+coefficients_reduced <- coef(fit0.poisson.backward)
+
+# Remove the intercepts
+coefficients_saturated <- coefficients_saturated[-1]
+coefficients_reduced <- coefficients_reduced[-1]
+
+# Create data frames for plotting
+coeff_df_saturated <- data.frame(
+  Variable = names(coefficients_saturated),
+  Coefficient = coefficients_saturated,
+  Model = 'Saturated'
+)
+
+coeff_df_reduced <- data.frame(
+  Variable = names(coefficients_reduced),
+  Coefficient = coefficients_reduced,
+  Model = 'Reduced'
+)
+
+# Combine the two data frames, allowing NAs for the variables not in the reduced model
+coeff_df_combined <- merge(coeff_df_saturated, coeff_df_reduced, by = "Variable", all = TRUE, suffixes = c(".Saturated", ".Reduced"))
+
+# Create a long format data frame for plotting with ggplot2
+coeff_df_long <- melt(coeff_df_combined, id.vars = "Variable", 
+                      measure.vars = c("Coefficient.Saturated", "Coefficient.Reduced"),
+                      variable.name = "Model", value.name = "Coefficient")
+
+# Sort the data frame by the value of the coefficients from the saturated model
+coeff_df_long <- coeff_df_long[order(-abs(coeff_df_long$Coefficient)),]
+
+# Reorder the variables based on the sorted coefficients for plotting
+coeff_df_long$Variable <- factor(coeff_df_long$Variable, levels = unique(coeff_df_long$Variable))
+
+# Plot using ggplot2
+ggplot(coeff_df_long, aes(x = Variable, y = Coefficient, fill = Model)) +
+  geom_bar(stat = "identity", position = position_dodge(width = 0.8)) +
+  coord_flip() +  # Flipping coordinates to make it easier to read variable names
+  scale_fill_manual(values = c("Coefficient.Saturated" = "blue", "Coefficient.Reduced" = "green", "NA" = "grey")) +  # Use blue and green for different models
+  labs(x = "Variable", y = "Coefficient Value", fill = "Model") +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 90, hjust = 1), legend.position = "bottom")  # Adjust the angle of x-axis labels if needed
+```
+
+Findings:
+
+
+
+#### Mixed model with clusters regarding of EMPSTAT (employed vs. unemployed)
+
+```{r}
+# library(lme4)
+# 
+# fit0.mixed <- glmer(CNAG ~ SEX + MAXEDUC + SPOUSEDUC + EMPSTAT + EMPHI + 
+#   QTCINCFAM + HEALTH + HEIGHT + WEIGHT + BMICALC + DIABTYPE + 
+#      ALCEV30D +  MOD10FWK + 
+#     (1 | EMPSTAT), 
+#   data = subset.age.clean, family = poisson(link = "log"),
+#   na.action = na.omit)
+# summary(fit0.mixed)
+# anova(fit0.mixed)
+# 
+# fit0.mixed.simplified <- glmer(CNAG ~ SEX+ BMICALC + DIABTYPE + 
+#     MOD10FWK   + (1 | EMPSTAT), 
+#   data = subset.age.clean, family = poisson(link = "log"),
+#   na.action = na.omit)
+# summary(fit0.mixed.simplified)
+# anova(fit0.mixed, fit0.mixed.simplified)
+```
+#### Drinking behavior 
+
+```{r}
+fit1.AL = glm(CNAG ~ ALCEV30D,
+           data=subset.age.clean.nb, family=poisson(link="log"),
+           na.action = na.omit)
+anova(fit1.AL)
+summary(fit1.AL)
+```
+
+```{r}
+anova(fit0.poisson, fit1.AL, test="Chisq")
+```
+
+
+```{r}
+fit1.MOD = glm(CNAG ~ MOD10FWK,
+           data=subset.age.clean.nb, family=poisson(link="log"),
+           na.action = na.omit)
+anova(fit1.MOD)
+summary(fit1.MOD)
+anova(fit0.poisson, fit1.MOD, test="Chisq")
+
+```
+
+### Negative binomial GLM
+
+The first time to success after Y years is a negative binomial problem.
+
+```{r}
+library(dplyr)
+library(MASS)
+
+  
+colSums(is.na(subset.age.clean.nb))
+
+fit.NB = glm.nb(CNAG ~ SEX + MAXEDUC + EMPSTAT + QTCINCFAM + HEALTH + HEIGHT + 
+  WEIGHT + BMICALC + DIABTYPE + ALCEV30D + MOD10FWK,
+  data = subset.age.clean.nb)
+
+summary(fit.NB)
+anova(fit.NB)
+
+fit.NB.reduced = stepAIC(fit.NB, direction="backward")
+summary(fit.NB.reduced)
+anova(fit.NB, fit.NB.reduced, test="Chisq")
+
+
+anova(fit0.poisson, fit.NB, test="Chisq")
+anova(fit0.poisson.backward, fit.NB.reduced, test="Chisq")
+
+
+
+```
+
+
+```{r}
+# Perform the likelihood ratio test
+lrt_result <- anova(fit0.poisson, fit.NB, test = "LRT")
+
+# Print the results of the likelihood ratio test
+print(lrt_result)
+```
+
+
+
+
+
+
+## Topic 2
+
+Response: binary CNLIVR
+
+```{r}
+head(data$CNLIVR)
+subset.CNLIVR.clean =  data.clean %>% 
+  # mutate(across(c("CNLIVR"), ~if_else(. >= 7, NA_real_, .))) %>%
+  filter(CNLIVR==1 | CNLIVR==2) %>%
+  mutate(CNLIVR=CNLIVR-1) %>% # Change label: Positive 2->1, negative 1->0
+  mutate(across(c(SEX, EMPSTAT, EMPHI, QTCINCFAM, 
+                  ALCDRINKEV, ALC5UPEVYR, ALCEV30D, # Binary variables
+                  DIABTYPE), # non-numerical factor
+                ~as_factor(as_factor(.))))
+fit.cnliver = glm(CNLIVR ~ AGE + SEX + MAXEDUC + SPOUSEDUC + 
+                    EMPSTAT + EMPHI + QTCINCFAM +
+                    HEALTH + HEIGHT + WEIGHT + BMICALC + DIABTYPE + 
+                    ALCDRINKEV +  ALCEV30D + ALC5UPOCC30D + MOD10FWK,
+                  data=subset.CNLIVR.clean, family=binomial(link = "logit"),
+                  na.action = na.omit)
+anova(fit.cnliver)
+summary(fit.cnliver)
+
+```
+
+```{r}
+#########################################
+## Reference Only, Not for final version
+#########################################
+
+#install.packages("glmnet")
+
+library(glmnet)
+
+x <- model.matrix(~ AGE + SEX + MAXEDUC + SPOUSEDUC + 
+                    EMPSTAT + EMPHI + QTCINCFAM +
+                    HEALTH + HEIGHT + WEIGHT + BMICALC + DIABTYPE + 
+                    ALCDRINKEV + ALCEV30D + ALC5UPOCC30D + MOD10FNO - 1, 
+                  data=subset.CNLIVR.clean)
+
+yx <- model.matrix(~CNLIVR+ AGE + SEX + MAXEDUC + SPOUSEDUC + 
+                     EMPSTAT + EMPHI + QTCINCFAM +
+                     HEALTH + HEIGHT + WEIGHT + BMICALC + DIABTYPE + 
+                     ALCDRINKEV + ALCEV30D + ALC5UPOCC30D + MOD10FNO - 1, 
+                   data=subset.CNLIVR.clean)
+y <- yx[,1]
+
+# Lasso regression
+fit.cnliver.glmnet <- glmnet(x, y, family="binomial", alpha=1)
+
+# You can then use cv.glmnet to find the optimal lambda value (regularization strength)
+fit.optimal <- cv.glmnet(x, y, family="binomial", alpha=1)
+# Plot the cross-validation curve
+plot(fit.optimal)
+
+```
+
+
+
+Correlation check
+
+```{r}
+head(data$MOD10FWK)
+table(data$MOD10FWK)
+# library(corrplot)
+# corr_matrix <- cor(subset.age, use=)
+# corrplot(corr_matrix, method = "color", addCoef.col = "black", 
+#          tl.col="black", tl.srt=45, cl.pos='b', type="upper")
+
+```
+
+
+
+
+
+```{r}
+# 
+# hist(subset.age.clean$ALC5UPEVYR)
+# ggplot2::ggplot(subset.age.clean, ggplot2::aes(x = as.factor(ALC5UPEVYR), y=CNAG)) + ggplot2::geom_boxplot()
+
+
+```
