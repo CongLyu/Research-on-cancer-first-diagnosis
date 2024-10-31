@@ -1,1 +1,1 @@
-Using Saturated and Unsaturated Poisson and Negative Binomials with Logarithmic Linking to Examine the Effects of Sex, Diabetes, Body Mass Index, and Other Physical or Social Factors on Age at First Cancer Diagnosis in Populations
+Using Saturated and Unsaturated Poisson and Negative Binomials with Log Link on response variable to examine the impacts of Sex, Diabetes, BMI, and Other Physical or Social Factors on Age at First Cancer Diagnosis in Populations.
